@@ -1,5 +1,8 @@
 /*
- * A globalmem driver
+ * A globalmem driver as an example of char device drivers
+ *
+ * The initial developer of the original code is Barry Song
+ * <author@linuxdriver.cn>. All Rights Reserved.
  */
 
 #include <linux/module.h>
