@@ -1,7 +1,7 @@
 KVERS = $(shell uname -r)
 
 # Kernel modules
-obj-m += helloworld.o
+obj-m += globalmem.o
 
 # Specify flags for the module compilation.
 #EXTRA_CFLAGS=-g -O0
