@@ -14,36 +14,36 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#define GLOBALMEM_SIZE	0x1000	/*ȫ���ڴ�����4K�ֽ�*/
-#define MEM_CLEAR 0x1  /*��0ȫ���ڴ�*/
-#define GLOBALMEM_MAJOR 250    /*Ԥ����globalmem�����豸��*/
+#define GLOBALMEM_SIZE	0x1000
+#define MEM_CLEAR 0x1
+#define GLOBALMEM_MAJOR 250
 
 static int globalmem_major = GLOBALMEM_MAJOR;
-/*globalmem�豸�ṹ��*/
+
 struct globalmem_dev {
-	struct cdev cdev; /*cdev�ṹ��*/
-	unsigned char mem[GLOBALMEM_SIZE]; /*ȫ���ڴ�*/
+	struct cdev cdev; 
+	unsigned char mem[GLOBALMEM_SIZE];
 };
 
-struct globalmem_dev *globalmem_devp; /*�豸�ṹ��ָ��*/
-/*�ļ��򿪺���*/
+struct globalmem_dev *globalmem_devp;
+
 int globalmem_open(struct inode *inode, struct file *filp)
 {
-	/*���豸�ṹ��ָ�븳ֵ���ļ�˽������ָ��*/
+
 	filp->private_data = globalmem_devp;
 	return 0;
 }
-/*�ļ��ͷź���*/
+
 int globalmem_release(struct inode *inode, struct file *filp)
 {
 	return 0;
 }
 
-/* ioctl�豸���ƺ��� */
+
 static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
 	int cmd, unsigned long arg)
 {
-	struct globalmem_dev *dev = filp->private_data;/*�����豸�ṹ��ָ��*/
+	struct globalmem_dev *dev = filp->private_data;
 
 	switch (cmd) {
 	case MEM_CLEAR:
@@ -58,22 +58,22 @@ static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
 	return 0;
 }
 
-/*������*/
+
 static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
 	loff_t *ppos)
 {
 	unsigned long p =  *ppos;
 	unsigned int count = size;
 	int ret = 0;
-	struct globalmem_dev *dev = filp->private_data; /*�����豸�ṹ��ָ��*/
+	struct globalmem_dev *dev = filp->private_data;
 
-	/*�����ͻ�ȡ��Ч��д����*/
+	
 	if (p >= GLOBALMEM_SIZE)
 		return 0;
 	if (count > GLOBALMEM_SIZE - p)
 		count = GLOBALMEM_SIZE - p;
 
-	/*�ں˿ռ�->�û��ռ�*/
+
 	if (copy_to_user(buf, (void *)(dev->mem + p), count)) {
 		ret =  - EFAULT;
 	} else {
@@ -86,22 +86,22 @@ static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
 	return ret;
 }
 
-/*д����*/
+
 static ssize_t globalmem_write(struct file *filp, const char __user *buf,
 	size_t size, loff_t *ppos)
 {
 	unsigned long p =  *ppos;
 	unsigned int count = size;
 	int ret = 0;
-	struct globalmem_dev *dev = filp->private_data; /*�����豸�ṹ��ָ��*/
+	struct globalmem_dev *dev = filp->private_data; 
 
-	/*�����ͻ�ȡ��Ч��д����*/
+
 	if (p >= GLOBALMEM_SIZE)
 		return 0;
 	if (count > GLOBALMEM_SIZE - p)
 		count = GLOBALMEM_SIZE - p;
 
-	/*�û��ռ�->�ں˿ռ�*/
+	
 	if (copy_from_user(dev->mem + p, buf, count))
 		ret =  - EFAULT;
 	else {
@@ -114,12 +114,12 @@ static ssize_t globalmem_write(struct file *filp, const char __user *buf,
 	return ret;
 }
 
-/* seek�ļ���λ���� */
+
 static loff_t globalmem_llseek(struct file *filp, loff_t offset, int orig)
 {
 	loff_t ret = 0;
 	switch (orig) {
-	case 0:   /*�����ļ���ʼλ��ƫ��*/
+	case 0:   
 		if (offset < 0)	{
 			ret =  - EINVAL;
 			break;
@@ -131,7 +131,7 @@ static loff_t globalmem_llseek(struct file *filp, loff_t offset, int orig)
 		filp->f_pos = (unsigned int)offset;
 		ret = filp->f_pos;
 		break;
-	case 1:   /*�����ļ���ǰλ��ƫ��*/
+	case 1:  
 		if ((filp->f_pos + offset) > GLOBALMEM_SIZE) {
 			ret =  - EINVAL;
 			break;
@@ -150,7 +150,6 @@ static loff_t globalmem_llseek(struct file *filp, loff_t offset, int orig)
 	return ret;
 }
 
-/*�ļ������ṹ��*/
 static const struct file_operations globalmem_fops = {
 	.owner = THIS_MODULE,
 	.llseek = globalmem_llseek,
@@ -161,7 +160,6 @@ static const struct file_operations globalmem_fops = {
 	.release = globalmem_release,
 };
 
-/*��ʼ����ע��cdev*/
 static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 {
 	int err, devno = MKDEV(globalmem_major, index);
@@ -173,25 +171,22 @@ static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 		printk(KERN_NOTICE "Error %d adding LED%d", err, index);
 }
 
-/*�豸����ģ�����غ���*/
 int globalmem_init(void)
 {
 	int result;
 	dev_t devno = MKDEV(globalmem_major, 0);
 
-	/* �����豸��*/
 	if (globalmem_major)
 		result = register_chrdev_region(devno, 1, "globalmem");
-	else { /* ��̬�����豸�� */
+	else { 
 		result = alloc_chrdev_region(&devno, 0, 1, "globalmem");
 		globalmem_major = MAJOR(devno);
 	}
 	if (result < 0)
 		return result;
 
-	/* ��̬�����豸�ṹ�����ڴ�*/
 	globalmem_devp = kmalloc(sizeof(struct globalmem_dev), GFP_KERNEL);
-	if (!globalmem_devp) {    /*����ʧ��*/
+	if (!globalmem_devp) {    
 		result =  - ENOMEM;
 		goto fail_malloc;
 	}
@@ -206,12 +201,11 @@ fail_malloc:
 	return result;
 }
 
-/*ģ��ж�غ���*/
 void globalmem_exit(void)
 {
-	cdev_del(&globalmem_devp->cdev);   /*ע��cdev*/
-	kfree(globalmem_devp);     /*�ͷ��豸�ṹ���ڴ�*/
-	unregister_chrdev_region(MKDEV(globalmem_major, 0), 1); /*�ͷ��豸��*/
+	cdev_del(&globalmem_devp->cdev);  
+	kfree(globalmem_devp);    
+	unregister_chrdev_region(MKDEV(globalmem_major, 0), 1); 
 }
 
 MODULE_AUTHOR("Barry Song <21cnbao@gmail.com>");
