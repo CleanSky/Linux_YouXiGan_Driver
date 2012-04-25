@@ -1,5 +1,5 @@
 /*
- * A globalmem driver
+ * The virtual globalmem chdev driver
  */
 
 #include <linux/module.h>
@@ -20,13 +20,16 @@
 
 static int globalmem_major = GLOBALMEM_MAJOR;
 
+/*globalmem设备结构体*/
 struct globalmem_dev {
 	struct cdev cdev; 
 	unsigned char mem[GLOBALMEM_SIZE];
 };
 
+/*一个globalmem声明*/
 struct globalmem_dev *globalmem_devp;
 
+/*打开globalmem*/
 int globalmem_open(struct inode *inode, struct file *filp)
 {
 
@@ -34,12 +37,13 @@ int globalmem_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+/*释放globalmem*/
 int globalmem_release(struct inode *inode, struct file *filp)
 {
 	return 0;
 }
 
-
+/*globalmem的IO控制*/
 static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
 	int cmd, unsigned long arg)
 {
@@ -58,7 +62,7 @@ static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
 	return 0;
 }
 
-
+/*读globalmem*/
 static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
 	loff_t *ppos)
 {
@@ -73,7 +77,6 @@ static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
 	if (count > GLOBALMEM_SIZE - p)
 		count = GLOBALMEM_SIZE - p;
 
-
 	if (copy_to_user(buf, (void *)(dev->mem + p), count)) {
 		ret =  - EFAULT;
 	} else {
@@ -86,7 +89,7 @@ static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
 	return ret;
 }
 
-
+/*写globalmem*/
 static ssize_t globalmem_write(struct file *filp, const char __user *buf,
 	size_t size, loff_t *ppos)
 {
@@ -95,12 +98,10 @@ static ssize_t globalmem_write(struct file *filp, const char __user *buf,
 	int ret = 0;
 	struct globalmem_dev *dev = filp->private_data; 
 
-
 	if (p >= GLOBALMEM_SIZE)
 		return 0;
 	if (count > GLOBALMEM_SIZE - p)
 		count = GLOBALMEM_SIZE - p;
-
 	
 	if (copy_from_user(dev->mem + p, buf, count))
 		ret =  - EFAULT;
@@ -114,7 +115,7 @@ static ssize_t globalmem_write(struct file *filp, const char __user *buf,
 	return ret;
 }
 
-
+/*globalmem的定位*/
 static loff_t globalmem_llseek(struct file *filp, loff_t offset, int orig)
 {
 	loff_t ret = 0;
@@ -150,6 +151,7 @@ static loff_t globalmem_llseek(struct file *filp, loff_t offset, int orig)
 	return ret;
 }
 
+/*globalmem file_operations*/
 static const struct file_operations globalmem_fops = {
 	.owner = THIS_MODULE,
 	.llseek = globalmem_llseek,
@@ -160,6 +162,7 @@ static const struct file_operations globalmem_fops = {
 	.release = globalmem_release,
 };
 
+/*globalmem启动*/
 static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 {
 	int err, devno = MKDEV(globalmem_major, index);
@@ -171,6 +174,7 @@ static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 		printk(KERN_NOTICE "Error %d adding LED%d", err, index);
 }
 
+/*globalmem初始化*/
 int globalmem_init(void)
 {
 	int result;
@@ -201,6 +205,7 @@ fail_malloc:
 	return result;
 }
 
+/*globalmem退出*/
 void globalmem_exit(void)
 {
 	cdev_del(&globalmem_devp->cdev);  
@@ -208,7 +213,7 @@ void globalmem_exit(void)
 	unregister_chrdev_region(MKDEV(globalmem_major, 0), 1); 
 }
 
-MODULE_AUTHOR("Barry Song <21cnbao@gmail.com>");
+MODULE_AUTHOR("Zou Bingsong<zoubingsong@163.com>");
 MODULE_LICENSE("Dual BSD/GPL");
 
 module_param(globalmem_major, int, S_IRUGO);
