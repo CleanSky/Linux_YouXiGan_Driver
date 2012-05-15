@@ -2,6 +2,9 @@
  * The virtual globalmem chdev driver
  */
 
+/*
+ *要包含的一些头文件
+ */
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>
@@ -14,11 +17,14 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#define GLOBALMEM_SIZE	0x1000
-#define MEM_CLEAR 0x1
-#define GLOBALMEM_MAJOR 250
+/*
+ *一些宏定义
+ */
+#define GLOBALMEM_SIZE	0x1000 //全局内存大小
+#define MEM_CLEAR 0x1	//清空
+#define GLOBALMEM_MAJOR 250	//主设备号
 
-static int globalmem_major = GLOBALMEM_MAJOR;
+static int globalmem_major = GLOBALMEM_MAJOR;	//主设备号为一个静态全局变量
 
 /*globalmem设备结构体*/
 struct globalmem_dev {
@@ -32,7 +38,6 @@ struct globalmem_dev *globalmem_devp;
 /*打开globalmem*/
 int globalmem_open(struct inode *inode, struct file *filp)
 {
-
 	filp->private_data = globalmem_devp;
 	return 0;
 }
@@ -170,8 +175,9 @@ static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 	cdev_init(&dev->cdev, &globalmem_fops);
 	dev->cdev.owner = THIS_MODULE;
 	err = cdev_add(&dev->cdev, devno, 1);
-	if (err)
+	if (err){
 		printk(KERN_NOTICE "Error %d adding LED%d", err, index);
+	}
 }
 
 /*globalmem初始化*/
@@ -198,6 +204,7 @@ int globalmem_init(void)
 	memset(globalmem_devp, 0, sizeof(struct globalmem_dev));
 
 	globalmem_setup_cdev(globalmem_devp, 0);
+
 	return 0;
 
 fail_malloc:
