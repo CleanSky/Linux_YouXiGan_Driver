@@ -1,15 +1,7 @@
-KVERS = $(shell uname -r)
+obj-m := globalfifo.o 
 
-# Kernel modules
-obj-m += globalfifo.o
-
-# Specify flags for the module compilation.
-EXTRA_CFLAGS=-g -O0
-
-build: kernel_modules
-
-kernel_modules:
-	make -C /lib/modules/$(KVERS)/build M=$(CURDIR) modules
-
+KERNELBUILD := /lib/modules/`uname -r`/build
+default:
+	 make -C $(KERNELBUILD) M=$(shell pwd) modules
 clean:
-	make -C /lib/modules/$(KVERS)/build M=$(CURDIR) clean
+	 rm -rf *.o .*.cmd *.ko *.mod.c .tmp_versions *.symvers *.order

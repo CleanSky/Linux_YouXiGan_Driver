@@ -1,54 +1,43 @@
 /*
  * The virtual globalmem chdev driver
  */
-
-/*
- *要包含的一些头文件
- */
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/cdev.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-/*
- *一些宏定义
- */
-#define GLOBALMEM_SIZE	0x1000 //全局内存大小
-#define MEM_CLEAR 0x1	//清空
-#define GLOBALMEM_MAJOR 250	//主设备号
+#define GLOBALMEM_SIZE	0x1000 
+#define MEM_CLEAR 0x1
+#define GLOBALMEM_MAJOR 250
 
-static int globalmem_major = GLOBALMEM_MAJOR;	//主设备号为一个静态全局变量
+static int globalmem_major = GLOBALMEM_MAJOR;
 
-/*globalmem设备结构体*/
 struct globalmem_dev {
 	struct cdev cdev; 
 	unsigned char mem[GLOBALMEM_SIZE];
 };
 
-/*一个globalmem声明*/
 struct globalmem_dev *globalmem_devp;
 
-/*打开globalmem*/
 int globalmem_open(struct inode *inode, struct file *filp)
 {
 	filp->private_data = globalmem_devp;
 	return 0;
 }
 
-/*释放globalmem*/
 int globalmem_release(struct inode *inode, struct file *filp)
 {
 	return 0;
 }
 
-/*globalmem的IO控制*/
 static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
 	int cmd, unsigned long arg)
 {
@@ -67,7 +56,6 @@ static int globalmem_ioctl(struct inode *inodep, struct file *filp, unsigned
 	return 0;
 }
 
-/*读globalmem*/
 static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
 	loff_t *ppos)
 {
@@ -94,7 +82,6 @@ static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size,
 	return ret;
 }
 
-/*写globalmem*/
 static ssize_t globalmem_write(struct file *filp, const char __user *buf,
 	size_t size, loff_t *ppos)
 {
@@ -120,7 +107,6 @@ static ssize_t globalmem_write(struct file *filp, const char __user *buf,
 	return ret;
 }
 
-/*globalmem的定位*/
 static loff_t globalmem_llseek(struct file *filp, loff_t offset, int orig)
 {
 	loff_t ret = 0;
@@ -156,18 +142,16 @@ static loff_t globalmem_llseek(struct file *filp, loff_t offset, int orig)
 	return ret;
 }
 
-/*globalmem file_operations*/
 static const struct file_operations globalmem_fops = {
 	.owner = THIS_MODULE,
 	.llseek = globalmem_llseek,
 	.read = globalmem_read,
 	.write = globalmem_write,
-	.ioctl = globalmem_ioctl,
+	.unlocked_ioctl = globalmem_ioctl,
 	.open = globalmem_open,
 	.release = globalmem_release,
 };
 
-/*globalmem启动*/
 static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 {
 	int err, devno = MKDEV(globalmem_major, index);
@@ -180,7 +164,6 @@ static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 	}
 }
 
-/*globalmem初始化*/
 int globalmem_init(void)
 {
 	int result;
@@ -212,7 +195,6 @@ fail_malloc:
 	return result;
 }
 
-/*globalmem退出*/
 void globalmem_exit(void)
 {
 	cdev_del(&globalmem_devp->cdev);  
