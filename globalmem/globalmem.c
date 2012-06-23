@@ -2,7 +2,7 @@
  * The virtual globalmem chdev driver
  * 最最基本的虚拟字符设备驱动
  */
-//要包含的一些头文件
+//包含的一些头文件
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>

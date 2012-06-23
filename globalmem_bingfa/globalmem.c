@@ -16,8 +16,8 @@
 #include <asm/uaccess.h>
 
 #define GLOBALMEM_SIZE	0x1000	//全局内存大小
-#define MEM_CLEAR 0x1			//全局内存清空
-#define GLOBALMEM_MAJOR 250		//预设的主设备号
+#define MEM_CLEAR 0x1		//全局内存清空
+#define GLOBALMEM_MAJOR 250	//预设的主设备号
 
 static int globalmem_major = GLOBALMEM_MAJOR;	//主设备号
 

@@ -12,4 +12,4 @@ default:
 
 #清空处理
 clean:
-	 rm -rf *.o .*.cmd *.ko *.mod.c .tmp_versions *.order *.symvers
+	 rm -rf *.o .*.cmd *.ko *.mod.c .tmp_versions *.order *.symvers *~

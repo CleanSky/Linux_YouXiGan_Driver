@@ -1,6 +1,7 @@
 /*
  * 本文件是包含阻塞和非阻塞情况的虚拟字符设备驱动文件
  */
+//包含的一些头文件
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>

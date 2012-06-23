@@ -3,7 +3,8 @@
  *加载hello.ko模块：sudo insmod helloworld.ko
  *卸载hello模块：sudo rmmod helloworld
 */
-#include <linux/init.h>		//头文件
+//包含的一些头文件
+#include <linux/init.h>	
 #include <linux/module.h>
 
 static int helloworld_init(void){		//模块加载函数

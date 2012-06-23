@@ -1,5 +1,5 @@
 /*
- *globalfifo异步通知测试文件
+ * globalfifo异步通知测试文件
  */
 #include <stdio.h>
 #include <stdlib.h>
