@@ -24,11 +24,12 @@ struct globalfifo_dev {
 	struct semaphore sem; 
 	wait_queue_head_t r_wait; 
 	wait_queue_head_t w_wait; 
-	struct fasync_struct *async_queue; 
+	struct fasync_struct *async_queue;	//异步结构体指针，用于读
 };
 
 struct globalfifo_dev *globalfifo_devp; 
 
+//支持异步通知的globalfifo设备驱动的fasync函数
 static int globalfifo_fasync(int fd, struct file *filp, int mode)
 {
 	struct globalfifo_dev *dev = filp->private_data; 
@@ -41,9 +42,10 @@ int globalfifo_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+//增加异步通知后的globalfifo设备驱动的release函数
 int globalfifo_release(struct inode *inode, struct file *filp)
 {
-	globalfifo_fasync( - 1, filp, 0);
+	globalfifo_fasync( - 1, filp, 0);	//将文件从异步通知队列中删除
 	return 0;
 }
 
@@ -88,6 +90,7 @@ static unsigned int globalfifo_poll(struct file *filp, poll_table *wait)
 	return mask;
 }
 
+//支持异步通知的globalfifo设备驱动的读函数
 static ssize_t globalfifo_read(struct file *filp, char __user *buf, size_t count,
 		loff_t *ppos)
 {
@@ -138,33 +141,36 @@ out2:
 	return ret;
 }
 
+//支持异步通知的globalfifo设备驱动的写函数
 static ssize_t globalfifo_write(struct file *filp, const char __user *buf,
 		size_t count, loff_t *ppos)
 {
-	struct globalfifo_dev *dev = filp->private_data;
+	struct globalfifo_dev *dev = filp->private_data;	//获得设备结构体指针
 	int ret;
-	DECLARE_WAITQUEUE(wait, current);
+	DECLARE_WAITQUEUE(wait, current);	//等待队列的定义
 
-	down(&dev->sem);
-	add_wait_queue(&dev->w_wait, &wait);
+	down(&dev->sem);	//获取信号量
+	add_wait_queue(&dev->w_wait, &wait);	//进入写等待队列头
 
+	//等待FIFO非满
 	if (dev->current_len == GLOBALFIFO_SIZE) {
-		if (filp->f_flags &O_NONBLOCK) {
+		if (filp->f_flags &O_NONBLOCK) {	//非阻塞访问
 			ret =  - EAGAIN;
 			goto out;
 		}
-		__set_current_state(TASK_INTERRUPTIBLE); 
+		__set_current_state(TASK_INTERRUPTIBLE);	//改变进程状态为睡眠
 		up(&dev->sem);
 
-		schedule(); 
-		if (signal_pending(current)) {
+		schedule();	//调度其他进程执行
+		if (signal_pending(current)) {	//如果是因为信号唤醒
 			ret =  - ERESTARTSYS;
 			goto out2;
 		}
 
-		down(&dev->sem); 
+		down(&dev->sem);	//获得信号量
 	}
 
+	//用户空间到内核空间
 	if (count > GLOBALFIFO_SIZE - dev->current_len)
 		count = GLOBALFIFO_SIZE - dev->current_len;
 
@@ -176,7 +182,8 @@ static ssize_t globalfifo_write(struct file *filp, const char __user *buf,
 		printk(KERN_INFO "written %d bytes(s),current_len:%d\n", count, dev
 				->current_len);
 
-		wake_up_interruptible(&dev->r_wait); 
+		wake_up_interruptible(&dev->r_wait);	//唤醒读等待队列
+		//产生异步读信号
 		if (dev->async_queue) {
 			kill_fasync(&dev->async_queue, SIGIO, POLL_IN);
 			printk(KERN_DEBUG "%s kill SIGIO\n", __func__);
@@ -186,9 +193,9 @@ static ssize_t globalfifo_write(struct file *filp, const char __user *buf,
 	}
 
 out:
-	up(&dev->sem); 
+	up(&dev->sem);	//释放信号量
 out2:
-	remove_wait_queue(&dev->w_wait, &wait); 
+	remove_wait_queue(&dev->w_wait, &wait);	//从附属的等待队列头移除
 	set_current_state(TASK_RUNNING);
 	return ret;
 }

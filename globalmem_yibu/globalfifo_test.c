@@ -1,3 +1,6 @@
+/*
+ *globalfifo异步通知测试文件
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
