@@ -69,17 +69,17 @@ static struct joydev *joydev_table[JOYDEV_MINORS];/*驱动支持的设备数组*
 static DEFINE_MUTEX(joydev_table_mutex);/*锁*/
 
 static void joydev_pass_event(struct joydev_client *client , struct js_event *event){
-         struct joydev *joydev = client->joydev;
+         //struct joydev *joydev = client->joydev;
 
            spin_lock(&client->buffer_lock);/*上锁*/
 
            client->buffer[client->head]=*event;
-           if(client->startup == joydev->nabs+joydev->nkey){
+          /* if(client->startup == joydev->nabs+joydev->nkey){
 			client->head++;
 			client->head &= JOYDEV_BUFFER_SIZE-1;/*0~63*/
-                         if(client->head == 63)
+                         /*if(client->head == 63)
 				client->startup=0;
- 			}
+ 			}*/
           spin_unlock(&client->buffer_lock);
 	 
 			
@@ -180,6 +180,7 @@ static void joydev_attach_client(struct joydev *joydev , struct joydev_client *c
 之前，新链表项的链接指针的修改对所有读者是可见的。*/
         list_add_tail_rcu(&client->node , &joydev->client_list);
         spin_unlock(&joydev->client_lock);
+         /*该函数由RCU写端调用，它将阻塞写者，直到所有的读者已经完成读端临界区，写者才可以继续下一步操作*/
         synchronize_rcu();
 }
 /*很显然这个函数和attach相对应，即从joydev中的client_list中删除node表项*/
@@ -188,7 +189,7 @@ static void joydev_detach_client(struct joydev *joydev , struct joydev_client *c
 	spin_lock(&joydev->client_lock);
         list_del_rcu(&client->node);
         spin_unlock(&joydev->client_lock);
- /*该函数由RCU写端调用，它将阻塞写者，直到经过grace period后，即所有的读者已经完成读端临
+ /*该函数由RCU写端调用，它将阻塞写者，直到所有的读者已经完成读端临
 界区，写者才可以继续下一步操作。如果有多个RCU写端调用该函数，他们将在一个grace period之后
 全部被唤醒。*/
         synchronize_rcu();
@@ -236,7 +237,6 @@ static int joydev_release(struct inode *inode ,struct file *file){
       /*注销设备*/
      put_device(&joydev->dev);
      return 0;
-
 }
 /*先查看在connect()函数中创建的节点文件的次设备号
   如大于驱动支持的最大设备数JOYDEV_MINORS则，错误，返回
@@ -257,8 +257,7 @@ static int joydev_open(struct inode *inode , struct file *file){
                 if(error)
                      return error;*/
                 joydev = joydev_table[i];
-                if(joydev)
-			get_device(&joydev->dev);
+                
                 mutex_unlock(&joydev_table_mutex);
 		
 		if(!joydev)return -ENODEV;
@@ -280,7 +279,7 @@ static int joydev_open(struct inode *inode , struct file *file){
                         return error;
 		}
                file->private_data = client;
-		nonseekable_open(inode , file);/*不支持随机定位*/
+		
             return 0;
                
 }
@@ -377,7 +376,8 @@ memset() 来初始化 ,所有申请的元素都被初始化为 0.kmalloc特殊�
 	joydev->dev.class = &input_class;/*加入input设备链表*/
 	joydev->dev.parent = &dev->dev;
 	joydev->dev.release = joydev_free;
-	device_initialize(&joydev->dev);/*这里所做的都是初始化一个设备*/
+	device_initialize(&joydev->dev);/*这里所做的都是初始化一个设备
+         ,用了这个函数后，可以很方便的使用get——device  put——device()函数。*/
 
 	
 /*在这个函数里所做的处理其实很简
