@@ -1,9 +1,10 @@
-#Makefile脚本编译文件
-obj-m := globalmem.o 
-
-KERNELBUILD := /lib/modules/`uname -r`/build
+obj-m := globalmem.o
 
 default:
-	 make -C $(KERNELBUILD) M=$(shell pwd) modules
+	make -C /lib/modules/`uname -r`/build M=$(shell pwd) modules
+
 clean:
-	 rm -rf *.o .*.cmd *.ko *.mod.c .tmp_versions *.symvers *.order *~
+	rm -rf *.o *.ko *.order *.symvers *.out *.mod.c
+
+distclean:
+	rm -rf *.o *.ko *.order *.symvers *.out *.mod.c .*.cmd *~ .tmp_versions

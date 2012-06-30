@@ -1,15 +1,15 @@
-KVERS = $(shell uname -r)
+#Makefile脚本，用来编译helloworld.c模块文件
 
-# Kernel modules
-obj-m += globalmem.o
+#编译成模块
+obj-m := joydev3.o 
 
-# Specify flags for the module compilation.
-#EXTRA_CFLAGS=-g -O0
+#编译器的路径
+KERNELBUILD := /lib/modules/`uname -r`/build
 
-build: kernel_modules
+#默认编译成模块
+default:
+	 make -C $(KERNELBUILD) M=$(shell pwd) modules
 
-kernel_modules:
-	make -C /lib/modules/$(KVERS)/build M=$(CURDIR) modules
-
+#清空处理
 clean:
-	make -C /lib/modules/$(KVERS)/build M=$(CURDIR) clean
+	 rm -rf *.o .*.cmd *.ko *.mod.c .tmp_versions *.order *.symvers *~ *.out
