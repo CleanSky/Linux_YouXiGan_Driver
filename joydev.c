@@ -41,8 +41,6 @@ struct joydev{
       struct mutex mutex; /*设备互斥锁*/
       struct device dev;/*设备结构体*/
       bool exist;   /*设备是否断开*/
-    struct  js_corr corr[ABS_CNT];
-    //struct   JS_DATA_SAVE_TYPE glue; /*和js_corr一起在joydtick.h中定义*/
     int nabs;/*方位数*/
     int nkey;/*按键数*/
      /*BTN_MISC=0X100
@@ -50,7 +48,6 @@ struct joydev{
        ABS_CNT=0x40
        BTN_STICK=0x120*/
     __u16 keymap[KEY_MAX - BTN_MISC + 1];
-    __u16 keypam[KEY_MAX - BTN_MISC + 1];
     __u8 absmap[ABS_CNT]; 
     __u8 abspam[ABS_CNT];
 /*上面四个数组分别存储按键和方位到位置，和位置到按键和方位的映射值。*/
@@ -61,7 +58,7 @@ struct joydev{
 struct joydev_client {  /* cunfang zhong duan event*/
 	struct js_event buffer[JOYDEV_BUFFER_SIZE];/*中断数*/
 	int head; 
-	int tail;
+	//int tail;
 	int startup;/*发生中断数*/
 	spinlock_t buffer_lock; /** 保护buffer */
 	struct joydev *joydev; /*设备*/
@@ -72,41 +69,21 @@ static struct joydev *joydev_table[JOYDEV_MINORS];/*驱动支持的设备数组*
 static DEFINE_MUTEX(joydev_table_mutex);/*锁*/
 
 static void joydev_pass_event(struct joydev_client *client , struct js_event *event){
-         struct joydev *joydev = client->joydev;
+         //struct joydev *joydev = client->joydev;
 
-           spin_lock(&client->buffer_lock);/*中断不能用了，只能用锁*/
+           spin_lock(&client->buffer_lock);/*上锁*/
 
            client->buffer[client->head]=*event;
-           if(client->startup == joydev->nabs+joydev->nkey){
+          /* if(client->startup == joydev->nabs+joydev->nkey){
 			client->head++;
 			client->head &= JOYDEV_BUFFER_SIZE-1;/*0~63*/
-                        if(client->head==client->tail)
+                         /*if(client->head == 63)
 				client->startup=0;
- 			}
+ 			}*/
           spin_unlock(&client->buffer_lock);
-	  //kill_fasync(&client->fasync,SIGIO,POLL_IN);/*异步通知，向fasync发送可读信号*/
+	 
 			
 	}
-
-static int joydev_correct(int value, struct js_corr *corr)
-{
-	switch (corr->type) {
-
-	case JS_CORR_NONE:
-		break;
-
-	case JS_CORR_BROKEN:
-		value = value > corr->coef[0] ? (value < corr->coef[1] ? 0 :
-			((corr->coef[3] * (value - corr->coef[1])) >> 14)) :
-			((corr->coef[2] * (value - corr->coef[0])) >> 14);
-		break;
-
-	default:
-		return 0;
-	}
-
-	return value < -32767 ? -32767 : (value > 32767 ? 32767 : value);
-}
 static void joydev_event(struct input_handle *handle , unsigned int type , unsigned int 
 code, int value){
 	struct joydev *joydev = handle->private;
@@ -123,7 +100,7 @@ code, int value){
   	     case EV_ABS:
                     event.type = JS_EVENT_AXIS; /*JS_EVENT_AXIS=2*/
 		    event.number = joydev->absmap[code];
-                    event.value = joydev_correct(value , &joydev->corr[event.number]);
+                    event.value =value;
                      /*下面这2句话的意思，将摇杆和方向按钮的值对应。变为一样*/
 	            if(event.value==joydev->abs[event.number])
                                   return ;
@@ -133,8 +110,9 @@ code, int value){
                        return ;
 		}
     		event.time = jiffies_to_msecs(jiffies);/*当前系统时间*/
-                     //printk("444time:%u,value:%x,type:%x,number:%x
-//        \n",event.time,event.value,event.type,event.number);
+/*if(event.type ==2 && (event.number == 0 || event.number == 1 || event.number==4 || event.number ==3))
+ printk("444time:%u,value:%x,type:%x,number:%x\n",event.time,event.value,event.type,event.number);*/
+int flag = 0;
     if(event.type==1 && event.value==1){
           switch(event.number){
                  case 0: printk("press 1\n");break;
@@ -147,25 +125,38 @@ code, int value){
                  case 7: printk("press right 2\n");break;
                  case 8: printk("press select \n");break;
                  case 9: printk("press start\n");break;
-                 default : ;
+                 default : flag=1;
             }
+         if(flag==0){
+                  rcu_read_lock();
+	list_for_each_entry_rcu(client, &joydev->client_list, node)
+		joydev_pass_event(client, &event);
+	rcu_read_unlock();
+                 }
+             flag=0;
           
       } 
         else if(event.type==2){
            switch(event.value){
-             case 0x7fff: if(event.number==0)printk("press right\n");
+             case 0xff: if(event.number==0)printk("press right\n");
                         else if(event.number==1)printk("press down\n");
+				rcu_read_lock();
+	list_for_each_entry_rcu(client, &joydev->client_list, node)
+		joydev_pass_event(client, &event);
+	rcu_read_unlock();
                       break;
-             case 0xffff8001 : if(event.number==0)printk("press left\n");
+
+             case 0x00 : if(event.number==0)printk("press left\n");
                         else if(event.number==1)printk("press up\n");
+                         rcu_read_lock();
+	list_for_each_entry_rcu(client, &joydev->client_list, node)
+		joydev_pass_event(client, &event);
+	rcu_read_unlock();
                       break;
              default : ;
             }
         }
-        rcu_read_lock();
-	list_for_each_entry_rcu(client, &joydev->client_list, node)
-		joydev_pass_event(client, &event);
-	rcu_read_unlock();
+       
 
 	
             
@@ -189,6 +180,7 @@ static void joydev_attach_client(struct joydev *joydev , struct joydev_client *c
 之前，新链表项的链接指针的修改对所有读者是可见的。*/
         list_add_tail_rcu(&client->node , &joydev->client_list);
         spin_unlock(&joydev->client_lock);
+         /*该函数由RCU写端调用，它将阻塞写者，直到所有的读者已经完成读端临界区，写者才可以继续下一步操作*/
         synchronize_rcu();
 }
 /*很显然这个函数和attach相对应，即从joydev中的client_list中删除node表项*/
@@ -197,7 +189,7 @@ static void joydev_detach_client(struct joydev *joydev , struct joydev_client *c
 	spin_lock(&joydev->client_lock);
         list_del_rcu(&client->node);
         spin_unlock(&joydev->client_lock);
- /*该函数由RCU写端调用，它将阻塞写者，直到经过grace period后，即所有的读者已经完成读端临
+ /*该函数由RCU写端调用，它将阻塞写者，直到所有的读者已经完成读端临
 界区，写者才可以继续下一步操作。如果有多个RCU写端调用该函数，他们将在一个grace period之后
 全部被唤醒。*/
         synchronize_rcu();
@@ -245,7 +237,6 @@ static int joydev_release(struct inode *inode ,struct file *file){
       /*注销设备*/
      put_device(&joydev->dev);
      return 0;
-
 }
 /*先查看在connect()函数中创建的节点文件的次设备号
   如大于驱动支持的最大设备数JOYDEV_MINORS则，错误，返回
@@ -261,12 +252,12 @@ static int joydev_open(struct inode *inode , struct file *file){
                 int i=iminor(inode);
 		if(i>JOYDEV_MINORS)
 			return -ENODEV;
-		error = mutex_lock_interruptible(&joydev_table_mutex);
+/*如果想等待这个锁，可以调用 mutex_lock。这个调用在互斥锁可用时返回，否则，在互斥锁锁可用之前它将休眠。无论在哪种情形中，当控制被返回时，调用者将持有互斥锁。最后，当调用者休眠时使用 mutex_lock_interruptible。在这种情况下，该函数可能返回 -EINTR。*/
+		/*error = mutex_lock_interruptible(&joydev_table_mutex);
                 if(error)
-                     return error;
+                     return error;*/
                 joydev = joydev_table[i];
-                if(joydev)
-			get_device(&joydev->dev);
+                
                 mutex_unlock(&joydev_table_mutex);
 		
 		if(!joydev)return -ENODEV;
@@ -288,7 +279,7 @@ static int joydev_open(struct inode *inode , struct file *file){
                         return error;
 		}
                file->private_data = client;
-		nonseekable_open(inode , file);
+		
             return 0;
                
 }
@@ -297,12 +288,13 @@ static ssize_t joydev_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
 	struct joydev_client *client = file->private_data;
-	struct joydev *joydev = client->joydev;
-	struct input_dev *input = joydev->handle.dev;
+	
 	struct js_event event;
          //event=client->buffer[1];
+   spin_lock(&client->buffer_lock);
  event=client->buffer[client->head] ;
-int i=0;
+   spin_unlock(&client->buffer_lock) ; 
+
         
         if (copy_to_user(buf, &event, sizeof(struct js_event)))   
 			return -EFAULT;
@@ -366,49 +358,26 @@ memset() 来初始化 ,所有申请的元素都被初始化为 0.kmalloc特殊�
 			joydev->abspam[joydev->nabs] = i;
 			joydev->nabs++;
 		}
-   for (i = 32; i < 43; i++)
-	//for (i = BTN_JOYSTICK - BTN_MISC; i < KEY_MAX - BTN_MISC + 1; i++)
+   
+	for (i = BTN_JOYSTICK - BTN_MISC; i < KEY_MAX - BTN_MISC + 1; i++)
 /* BIN_MISC  
 ，事件类型如果和别的输入类型都不匹配，那么就是BIN_MISC型*/
 		if (test_bit(i + BTN_MISC, dev->keybit)) {  /**/
 			joydev->keymap[i] = joydev->nkey;
-			joydev->keypam[joydev->nkey] = i + BTN_MISC;
+			//joydev->keypam[joydev->nkey] = i + BTN_MISC;
 			joydev->nkey++;
 		}
 
 	
 
-	for (i = 0; i < joydev->nabs; i++) { /*有多少个方向*/
-		j = joydev->abspam[i];/*第j个方向*/
-		if (input_abs_get_max(dev, j) == input_abs_get_min(dev, j)) {
-			joydev->corr[i].type = JS_CORR_NONE; /*JS_CORR_NONE的值为：0;*/
-			joydev->abs[i] = input_abs_get_val(dev, j);
-			continue;
-		}
-		joydev->corr[i].type = JS_CORR_BROKEN;/*JS_CORR_BROKEN的值为：1;*/
-		joydev->corr[i].prec = input_abs_get_fuzz(dev, j);
-
-		t = (input_abs_get_max(dev, j) + input_abs_get_min(dev, j)) / 2;
-		joydev->corr[i].coef[0] = t - input_abs_get_flat(dev, j);
-		joydev->corr[i].coef[1] = t + input_abs_get_flat(dev, j);
-
-		t = (input_abs_get_max(dev, j) - input_abs_get_min(dev, j)) / 2
-			- 2 * input_abs_get_flat(dev, j);
-		if (t) {
-			joydev->corr[i].coef[2] = (1 << 29) / t;
-			joydev->corr[i].coef[3] = (1 << 29) / t;
-
-			joydev->abs[i] =
-				joydev_correct(input_abs_get_val(dev, j),
-					       joydev->corr + i);
-		}
-	}
+	
 
 	joydev->dev.devt = MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor);
 	joydev->dev.class = &input_class;/*加入input设备链表*/
 	joydev->dev.parent = &dev->dev;
 	joydev->dev.release = joydev_free;
-	device_initialize(&joydev->dev);/*这里所做的都是初始化一个设备*/
+	device_initialize(&joydev->dev);/*这里所做的都是初始化一个设备
+         ,用了这个函数后，可以很方便的使用get——device  put——device()函数。*/
 
 	
 /*在这个函数里所做的处理其实很简
@@ -420,8 +389,6 @@ memset() 来初始化 ,所有申请的元素都被初始化为 0.kmalloc特殊�
              error = device_add(&joydev->dev);
            if(error){
        
-
-	
        mutex_lock(&joydev->mutex);
 	joydev->exist = false;
 	mutex_unlock(&joydev->mutex);
@@ -429,8 +396,6 @@ memset() 来初始化 ,所有申请的元素都被初始化为 0.kmalloc特殊�
        mutex_lock(&joydev_table_mutex);
 	joydev_table[joydev->minor] = NULL;
 	mutex_unlock(&joydev_table_mutex);
-
-
 
          return error;
 }

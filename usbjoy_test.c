@@ -10,7 +10,7 @@
     int main(int argc, char **argv)    
     {    
          /*事件结构体*/
-         struct js_event event;  
+         struct js_event *event=malloc(sizeof(struct js_event));;  
              int fd;
              /*打开设备*/
          fd = open("/dev/input/js0", O_RDWR);  
@@ -20,9 +20,11 @@
          if(fd != -1)    
          {    
          printf("open device successfully\n"); 
+          struct js_event event1;
+             
               while(1){
             /*从内核读取事件*/
-            j=read(fd,&event,sizeof(struct js_event));
+            j=read(fd,event,sizeof(struct js_event));
            if(j<0)
               {
              printf("read buffer error!!!\n"); 
@@ -32,8 +34,9 @@
              /*根据读出来的event 输出相应的按键
                  type=1为ev_key事件
                     type=2为ev_abs事件*/
-         if(event.type==1 && event.value==1){
-          switch(event.number){
+     // printf("event.number:%u event.value:%u .event.type:%u!!!\n",event->number,event->value,event->type); 
+         if(event->type==1 && event->value==1){
+          switch(event->number){
                  case 0: printf("press 1\n");break;
                  case 1: printf("press 2\n");break;
                  case 2: printf("press 3\n");break;
@@ -48,18 +51,19 @@
             }
           
       } 
-        else if(event.type==2){
-           switch(event.value){
-             case 0x7fff: if(event.number==0)printf("press right\n");
-                        else if(event.number==1)printf("press down\n");
+        else if(event->type==2){
+           switch(event->value){
+             case 0xff: {if(event->number==0)printf("press right\n");
+                        else if(event->number==1)printf("press down\n");
+				}
                       break;
-             case 0xffff8001 : if(event.number==0)printf("press left\n");
-                        else if(event.number==1)printf("press up\n");
+
+             case 0x00 : if(event->number==0)printf("press left\n");
+                        else if(event->number==1)printf("press up\n");
                       break;
              default : ;
             }
         }
-
 
             sleep(1);
               i++;
